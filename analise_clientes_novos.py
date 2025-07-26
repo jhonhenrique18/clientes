@@ -1927,13 +1927,14 @@ def calcular_projecoes_melhoradas(df, meta_mensal=850000, dias_uteis=27):
 def carregar_dados_varejo():
     """Carrega dados do varejo - apenas julho 2025"""
     try:
-        # Procurar arquivo de varejo
+        # Procurar arquivo de varejo mais recente
         arquivos_varejo = [f for f in os.listdir('.') if 'varejo' in f.lower() and f.endswith('.txt')]
         
         if not arquivos_varejo:
             return None
         
-        arquivo_varejo = arquivos_varejo[0]  # Pegar o primeiro arquivo encontrado
+        # Priorizar arquivo mais atualizado (com data mais recente no nome)
+        arquivo_varejo = sorted(arquivos_varejo)[-1]  # Último na ordem alfabética (mais recente)
         
         # Tentar diferentes encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-8-sig', 'cp850']
