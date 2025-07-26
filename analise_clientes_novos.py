@@ -1502,8 +1502,56 @@ def processar_arquivo_novo(arquivo_uploaded):
         st.error(f"❌ Erro ao processar arquivo: {str(e)}")
         return False
 
+def processar_arquivo_atacado(arquivo_uploaded):
+    """Processa e atualiza especificamente dados do atacado"""
+    try:
+        # Fazer backup do arquivo atual
+        arquivos_atacado = [f for f in os.listdir('.') if f.startswith('Vendas até') and f.endswith('.txt')]
+        if arquivos_atacado:
+            arquivo_atual = sorted(arquivos_atacado)[-1]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_nome = f"backup_atacado_{timestamp}.txt"
+            shutil.copy2(arquivo_atual, backup_nome)
+        
+        # Salvar novo arquivo de atacado
+        conteudo = arquivo_uploaded.read().decode('latin-1')
+        novo_nome = f"Vendas até {datetime.now().strftime('%d-%m-%Y')}.txt"
+        
+        with open(novo_nome, 'w', encoding='latin-1') as f:
+            f.write(conteudo)
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao processar arquivo do atacado: {str(e)}")
+        return False
+
+def processar_arquivo_varejo(arquivo_uploaded):
+    """Processa e atualiza especificamente dados do varejo"""
+    try:
+        # Fazer backup do arquivo atual (se existir)
+        arquivos_varejo = [f for f in os.listdir('.') if 'varejo' in f.lower() and f.endswith('.txt')]
+        if arquivos_varejo:
+            arquivo_atual = arquivos_varejo[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_nome = f"backup_varejo_{timestamp}.txt"
+            shutil.copy2(arquivo_atual, backup_nome)
+        
+        # Salvar novo arquivo de varejo
+        conteudo = arquivo_uploaded.read().decode('latin-1')
+        novo_nome = f"Varejo {datetime.now().strftime('%B').lower()} até dia {datetime.now().strftime('%d')}.txt"
+        
+        with open(novo_nome, 'w', encoding='latin-1') as f:
+            f.write(conteudo)
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Erro ao processar arquivo do varejo: {str(e)}")
+        return False
+
 def interface_atualizacao():
-    """Interface para atualização de dados"""
+    """Interface para atualização de dados - MANTER POR COMPATIBILIDADE"""
     st.header("📊 Atualizar Dados de Vendas")
     
     st.info("🔄 **Como usar:** Faça upload do arquivo de vendas do dia para adicionar aos dados existentes")
@@ -1575,6 +1623,71 @@ def dashboard_geral(df, layout_mode):
         st.metric("🎯 Ticket Médio", f"R$ {ticket_medio:,.2f}")
     
     st.info("🚧 **Em desenvolvimento**: Dashboard com mais métricas estratégicas será adicionado em breve.")
+
+def obter_data_mais_recente_str(df):
+    """Obtém a data mais recente dos dados como string para usar em títulos dinâmicos"""
+    df_temp = df.copy()
+    df_temp['Data_Competencia'] = pd.to_datetime(df_temp['Data_Competencia'], format='%d/%m/%Y', errors='coerce')
+    df_temp = df_temp.dropna(subset=['Data_Competencia'])
+    
+    if df_temp.empty:
+        return None
+    
+    data_mais_recente = df_temp['Data_Competencia'].max()
+    return data_mais_recente.strftime('%d/%m/%Y')
+
+def gerar_titulo_vendas_dinamico(df, prefixo="Vendas"):
+    """Gera título dinâmico baseado na data mais recente dos dados"""
+    data_recente = obter_data_mais_recente_str(df)
+    if data_recente:
+        return f"🔥 {prefixo} de {data_recente}"
+    else:
+        return f"🔥 {prefixo} de Hoje"
+
+def espacamento_responsivo(layout_mode=None):
+    """Cria espaçamento responsivo baseado no layout"""
+    if layout_mode is None:
+        layout_mode = st.session_state.get('layout_mode', '🖥️ Desktop')
+    
+    if layout_mode == "📱 Mobile":
+        # Mobile: espaço mínimo
+        st.markdown("<br>", unsafe_allow_html=True)
+    else:
+        # Desktop: linha divisória completa
+        st.markdown("---")
+
+def config_grafico_mobile(fig, layout_mode=None):
+    """Configura gráfico Plotly para mobile"""
+    if layout_mode is None:
+        layout_mode = st.session_state.get('layout_mode', '🖥️ Desktop')
+    
+    if layout_mode == "📱 Mobile":
+        # Configurações específicas para mobile
+        fig.update_layout(
+            height=300,  # Altura menor para mobile
+            margin=dict(l=10, r=10, t=30, b=10),  # Margens menores
+            font=dict(size=10),  # Fonte menor
+            title_font_size=12,  # Título menor
+            showlegend=True,
+            legend=dict(
+                orientation="h",  # Legenda horizontal
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5,
+                font=dict(size=9)
+            )
+        )
+    else:
+        # Configurações para desktop (padrão)
+        fig.update_layout(
+            height=400,
+            margin=dict(l=20, r=20, t=50, b=20),
+            font=dict(size=12),
+            title_font_size=16
+        )
+    
+    return fig
 
 def calcular_vendas_hoje_ontem(df):
     """Calcula vendas de hoje vs ontem usando dados reais"""
@@ -1933,8 +2046,10 @@ def dashboard_varejo(df_varejo, layout_mode):
         return
     
     # === 1. VENDAS DE HOJE ===
-    st.markdown("### 🔥 Vendas de Hoje")
-    st.caption("*Performance do varejo hoje - Valor Líquido*")
+    titulo_dinamico = gerar_titulo_vendas_dinamico(df_varejo, "Vendas")
+    st.markdown(f"### {titulo_dinamico}")
+    data_recente = obter_data_mais_recente_str(df_varejo)
+    st.caption(f"*Performance do varejo - {data_recente} - Valor Líquido*")
     
     # Calcular vendas de hoje
     df_varejo_temp = df_varejo.copy()
@@ -2108,7 +2223,10 @@ def dashboard_varejo(df_varejo, layout_mode):
                     color='Faturamento',
                     color_continuous_scale='Greens'
                 )
-                fig_fat.update_layout(height=500, yaxis={'categoryorder':'total ascending'})
+                fig_fat.update_layout(yaxis={'categoryorder':'total ascending'})
+                
+                # Aplicar configuração responsiva
+                fig_fat = config_grafico_mobile(fig_fat, layout_mode)
                 st.plotly_chart(fig_fat, use_container_width=True)
                 
                 # Análise de concentração
@@ -2213,8 +2331,30 @@ def dashboard_geral_consolidado(df_atacado, df_varejo, layout_mode):
         return
     
     # === 1. VENDAS DE HOJE ===
-    st.markdown("### 🔥 Vendas de Hoje - Visão Geral")
-    st.caption("*Performance dos dois setores hoje*")
+    # Usar a data mais recente entre atacado e varejo
+    data_atacado = obter_data_mais_recente_str(df_atacado) if tem_atacado else None
+    data_varejo = obter_data_mais_recente_str(df_varejo) if tem_varejo else None
+    
+    # Determinar qual data usar no título
+    if data_atacado and data_varejo:
+        # Converter para datetime para comparar e usar a mais recente
+        data_atac_dt = pd.to_datetime(data_atacado, format='%d/%m/%Y')
+        data_var_dt = pd.to_datetime(data_varejo, format='%d/%m/%Y')
+        data_titulo = data_atacado if data_atac_dt >= data_var_dt else data_varejo
+    elif data_atacado:
+        data_titulo = data_atacado
+    elif data_varejo:
+        data_titulo = data_varejo
+    else:
+        data_titulo = "Hoje"
+    
+    # Título responsivo
+    if layout_mode == "📱 Mobile":
+        st.markdown(f"**🔥 Vendas de {data_titulo}**")
+        st.caption(f"*{data_titulo}*")
+    else:
+        st.markdown(f"### 🔥 Vendas de {data_titulo} - Visão Geral")
+        st.caption(f"*Performance dos dois setores - {data_titulo}*")
     
     # Calcular vendas de hoje para ambos os setores
     vendas_hoje_atacado = calcular_comparacoes_temporais(df_atacado) if tem_atacado else None
@@ -2245,95 +2385,180 @@ def dashboard_geral_consolidado(df_atacado, df_varejo, layout_mode):
     vendas_varejo_hoje = vendas_hoje_varejo['vendas'] if vendas_hoje_varejo else 0
     vendas_total_hoje = vendas_atacado_hoje + vendas_varejo_hoje
     
-    # Primeira linha: Totais consolidados
-    col_total1, col_total2, col_total3, col_total4 = st.columns(4)
-    
-    with col_total1:
-        st.metric(
-            label="💰 Faturamento Total Hoje",
-            value=f"R$ {fat_total:,.2f}",
-            help="Soma do faturamento líquido de atacado + varejo hoje"
-        )
-    
-    with col_total2:
-        st.metric(
-            label="🛒 Vendas Total Hoje",
-            value=f"{vendas_total_hoje}",
-            help="Soma das vendas de atacado + varejo hoje"
-        )
-    
-    with col_total3:
-        ticket_total_hoje = fat_total / vendas_total_hoje if vendas_total_hoje > 0 else 0
-        st.metric(
-            label="📊 Ticket Médio Geral",
-            value=f"R$ {ticket_total_hoje:,.2f}",
-            help="Valor médio por venda hoje (ambos os setores)"
-        )
-    
-    with col_total4:
-        # Comparação com ontem (apenas atacado tem histórico)
-        if vendas_hoje_atacado and vendas_hoje_atacado['var_ontem']['faturamento'] != 0:
-            var_ontem = vendas_hoje_atacado['var_ontem']['faturamento']
-            delta_ontem = f"{var_ontem:+.1f}% vs ontem"
-            cor_ontem = "normal" if var_ontem >= 0 else "inverse"
-        else:
-            delta_ontem = "Sem comparativo"
-            cor_ontem = "off"
+    # Layout responsivo para métricas principais
+    if layout_mode == "📱 Mobile":
+        # Mobile: 2 linhas de 2 colunas para melhor legibilidade
+        st.markdown("**📊 Métricas Principais:**")
         
-        data_ref = vendas_hoje_atacado['hoje']['data'] if vendas_hoje_atacado else vendas_hoje_varejo['data'] if vendas_hoje_varejo else "N/A"
+        # Primeira linha mobile
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.metric(
+                label="💰 Faturamento Total",
+                value=f"R$ {fat_total:,.0f}",
+                help="Soma atacado + varejo hoje"
+            )
+        with col_m2:
+            st.metric(
+                label="🛒 Vendas Total",
+                value=f"{vendas_total_hoje}",
+                help="Total de vendas hoje"
+            )
         
-        st.metric(
-            label="📅 Última Atualização",
-            value=data_ref.strftime('%d/%m/%Y') if data_ref != "N/A" else "N/A",
-            delta=delta_ontem,
-            delta_color=cor_ontem,
-            help="Comparação com o dia anterior (baseado no atacado)"
-        )
+        # Segunda linha mobile
+        col_m3, col_m4 = st.columns(2)
+        with col_m3:
+            ticket_total_hoje = fat_total / vendas_total_hoje if vendas_total_hoje > 0 else 0
+            st.metric(
+                label="📊 Ticket Médio",
+                value=f"R$ {ticket_total_hoje:,.0f}",
+                help="Valor médio por venda"
+            )
+        with col_m4:
+            # Última atualização simplificada
+            data_ref = vendas_hoje_atacado['hoje']['data'] if vendas_hoje_atacado else vendas_hoje_varejo['data'] if vendas_hoje_varejo else "N/A"
+            st.metric(
+                label="📅 Atualização",
+                value=data_ref.strftime('%d/%m') if data_ref != "N/A" else "N/A",
+                help="Data dos dados"
+            )
     
-    # Segunda linha: Vendas separadas por setor
-    st.markdown("**📊 Vendas por Setor:**")
-    col_setor1, col_setor2, col_setor3, col_setor4 = st.columns(4)
+    else:
+        # Desktop: layout original com 4 colunas
+        col_total1, col_total2, col_total3, col_total4 = st.columns(4)
+        
+        with col_total1:
+            st.metric(
+                label="💰 Faturamento Total Hoje",
+                value=f"R$ {fat_total:,.2f}",
+                help="Soma do faturamento líquido de atacado + varejo hoje"
+            )
+        
+        with col_total2:
+            st.metric(
+                label="🛒 Vendas Total Hoje",
+                value=f"{vendas_total_hoje}",
+                help="Soma das vendas de atacado + varejo hoje"
+            )
+        
+        with col_total3:
+            ticket_total_hoje = fat_total / vendas_total_hoje if vendas_total_hoje > 0 else 0
+            st.metric(
+                label="📊 Ticket Médio Geral",
+                value=f"R$ {ticket_total_hoje:,.2f}",
+                help="Valor médio por venda hoje (ambos os setores)"
+            )
+        
+        with col_total4:
+            # Comparação com ontem (apenas atacado tem histórico)
+            if vendas_hoje_atacado and vendas_hoje_atacado['var_ontem']['faturamento'] != 0:
+                var_ontem = vendas_hoje_atacado['var_ontem']['faturamento']
+                delta_ontem = f"{var_ontem:+.1f}% vs ontem"
+                cor_ontem = "normal" if var_ontem >= 0 else "inverse"
+            else:
+                delta_ontem = "Sem comparativo"
+                cor_ontem = "off"
+            
+            data_ref = vendas_hoje_atacado['hoje']['data'] if vendas_hoje_atacado else vendas_hoje_varejo['data'] if vendas_hoje_varejo else "N/A"
+            
+            st.metric(
+                label="📅 Última Atualização",
+                value=data_ref.strftime('%d/%m/%Y') if data_ref != "N/A" else "N/A",
+                delta=delta_ontem,
+                delta_color=cor_ontem,
+                help="Comparação com o dia anterior (baseado no atacado)"
+            )
     
-    with col_setor1:
-        st.metric(
-            label="🏢 Venda Atacado",
-            value=f"R$ {fat_atacado:,.2f}",
-            delta=f"{vendas_atacado_hoje} vendas",
-            help="Faturamento líquido do atacado hoje"
-        )
+    # Vendas separadas por setor - Layout responsivo
+    if layout_mode == "📱 Mobile":
+        st.markdown("**🏢 Por Setor:**")
+        
+        # Primeira linha mobile: Valores absolutos
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            st.metric(
+                label="🏢 Atacado",
+                value=f"R$ {fat_atacado:,.0f}",
+                delta=f"{vendas_atacado_hoje} vendas",
+                help="Faturamento atacado hoje"
+            )
+        with col_s2:
+            st.metric(
+                label="🏪 Varejo", 
+                value=f"R$ {fat_varejo:,.0f}",
+                delta=f"{vendas_varejo_hoje} vendas",
+                help="Faturamento varejo hoje"
+            )
+        
+        # Segunda linha mobile: Participações
+        if fat_total > 0:
+            col_s3, col_s4 = st.columns(2)
+            part_atacado = (fat_atacado / fat_total * 100)
+            part_varejo = (fat_varejo / fat_total * 100)
+            
+            with col_s3:
+                st.metric(
+                    label="📈 Part. Atacado",
+                    value=f"{part_atacado:.1f}%",
+                    help="% do faturamento"
+                )
+            with col_s4:
+                st.metric(
+                    label="📊 Part. Varejo",
+                    value=f"{part_varejo:.1f}%",
+                    help="% do faturamento"
+                )
     
-    with col_setor2:
-        st.metric(
-            label="🏪 Venda Varejo", 
-            value=f"R$ {fat_varejo:,.2f}",
-            delta=f"{vendas_varejo_hoje} vendas",
-            help="Faturamento líquido do varejo hoje"
-        )
-    
-    with col_setor3:
-        # Participação do atacado
-        part_atacado = (fat_atacado / fat_total * 100) if fat_total > 0 else 0
-        st.metric(
-            label="📈 Part. Atacado",
-            value=f"{part_atacado:.1f}%",
-            help="Participação do atacado no faturamento de hoje"
-        )
-    
-    with col_setor4:
-        # Participação do varejo
-        part_varejo = (fat_varejo / fat_total * 100) if fat_total > 0 else 0
-        st.metric(
-            label="📊 Part. Varejo",
-            value=f"{part_varejo:.1f}%",
-            help="Participação do varejo no faturamento de hoje"
-        )
+    else:
+        # Desktop: layout original
+        st.markdown("**📊 Vendas por Setor:**")
+        col_setor1, col_setor2, col_setor3, col_setor4 = st.columns(4)
+        
+        with col_setor1:
+            st.metric(
+                label="🏢 Venda Atacado",
+                value=f"R$ {fat_atacado:,.2f}",
+                delta=f"{vendas_atacado_hoje} vendas",
+                help="Faturamento líquido do atacado hoje"
+            )
+        
+        with col_setor2:
+            st.metric(
+                label="🏪 Venda Varejo", 
+                value=f"R$ {fat_varejo:,.2f}",
+                delta=f"{vendas_varejo_hoje} vendas",
+                help="Faturamento líquido do varejo hoje"
+            )
+        
+        with col_setor3:
+            # Participação do atacado
+            part_atacado = (fat_atacado / fat_total * 100) if fat_total > 0 else 0
+            st.metric(
+                label="📈 Part. Atacado",
+                value=f"{part_atacado:.1f}%",
+                help="Participação do atacado no faturamento de hoje"
+            )
+        
+        with col_setor4:
+            # Participação do varejo
+            part_varejo = (fat_varejo / fat_total * 100) if fat_total > 0 else 0
+            st.metric(
+                label="📊 Part. Varejo",
+                value=f"{part_varejo:.1f}%",
+                help="Participação do varejo no faturamento de hoje"
+            )
 
     
     # === 2. CLIENTES NOVOS (ATACADO) ===
     if tem_atacado:
-        st.markdown("---")
-        st.markdown("### 👥 Clientes Novos - Hoje")
-        st.caption("*Análise de novos clientes no setor de atacado*")
+        espacamento_responsivo(layout_mode)
+        # Título responsivo
+        if layout_mode == "📱 Mobile":
+            st.markdown("**👥 Clientes Novos**")
+            st.caption("*Atacado*")
+        else:
+            st.markdown("### 👥 Clientes Novos - Hoje")
+            st.caption("*Análise de novos clientes no setor de atacado*")
         
         # Calcular clientes novos de hoje
         df_temp_clientes = df_atacado.copy()
@@ -2504,49 +2729,84 @@ def dashboard_geral_consolidado(df_atacado, df_varejo, layout_mode):
             • Revisar estratégias se projeção divergir da meta
             """)
     
-    # Detalhamento por setor
-    col_det1, col_det2 = st.columns(2)
-    
-    with col_det1:
-        st.markdown("**🏢 Detalhamento Atacado:**")
+    # Detalhamento por setor - Layout responsivo
+    if layout_mode == "📱 Mobile":
+        # Mobile: seções empilhadas
+        st.markdown("**🏢 Atacado:**")
         if metricas_atacado:
             dias_atacado = metricas_atacado['dias_com_vendas']
-            st.write(f"• **Dias trabalhados**: {dias_atacado}")
-            st.write(f"• **Faturamento líquido**: R$ {faturamento_atacado:,.2f}")
-            st.write(f"• **Média diária**: R$ {media_diaria_atacado:,.2f}")
-            st.write(f"• **Projeção setor**: R$ {media_diaria_atacado * dias_uteis:,.2f}")
+            col_m1, col_m2 = st.columns(2)
+            with col_m1:
+                st.write(f"• **Dias**: {dias_atacado}")
+                st.write(f"• **Faturamento**: R$ {faturamento_atacado:,.0f}")
+            with col_m2:
+                st.write(f"• **Média diária**: R$ {media_diaria_atacado:,.0f}")
+                st.write(f"• **Projeção**: R$ {media_diaria_atacado * dias_uteis:,.0f}")
+        else:
+            st.write("• Dados não disponíveis")
+        
+        st.markdown("**🏪 Varejo:**")
+        if metricas_varejo:
+            dias_varejo = metricas_varejo['dias_com_vendas']
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                st.write(f"• **Dias**: {dias_varejo}")
+                st.write(f"• **Faturamento**: R$ {faturamento_varejo:,.0f}")
+            with col_v2:
+                st.write(f"• **Média diária**: R$ {media_diaria_varejo:,.0f}")
+                st.write(f"• **Projeção**: R$ {media_diaria_varejo * dias_uteis:,.0f}")
         else:
             st.write("• Dados não disponíveis")
     
-    with col_det2:
-        st.markdown("**🏪 Detalhamento Varejo:**")
-        if metricas_varejo:
-            dias_varejo = metricas_varejo['dias_com_vendas']
-            st.write(f"• **Dias trabalhados**: {dias_varejo}")
-            st.write(f"• **Faturamento líquido**: R$ {faturamento_varejo:,.2f}")
-            st.write(f"• **Média diária**: R$ {media_diaria_varejo:,.2f}")
-            st.write(f"• **Projeção setor**: R$ {media_diaria_varejo * dias_uteis:,.2f}")
-        else:
-            st.write("• Dados não disponíveis")
+    else:
+        # Desktop: layout original com colunas lado a lado
+        col_det1, col_det2 = st.columns(2)
+        
+        with col_det1:
+            st.markdown("**🏢 Detalhamento Atacado:**")
+            if metricas_atacado:
+                dias_atacado = metricas_atacado['dias_com_vendas']
+                st.write(f"• **Dias trabalhados**: {dias_atacado}")
+                st.write(f"• **Faturamento líquido**: R$ {faturamento_atacado:,.2f}")
+                st.write(f"• **Média diária**: R$ {media_diaria_atacado:,.2f}")
+                st.write(f"• **Projeção setor**: R$ {media_diaria_atacado * dias_uteis:,.2f}")
+            else:
+                st.write("• Dados não disponíveis")
+        
+        with col_det2:
+            st.markdown("**🏪 Detalhamento Varejo:**")
+            if metricas_varejo:
+                dias_varejo = metricas_varejo['dias_com_vendas']
+                st.write(f"• **Dias trabalhados**: {dias_varejo}")
+                st.write(f"• **Faturamento líquido**: R$ {faturamento_varejo:,.2f}")
+                st.write(f"• **Média diária**: R$ {media_diaria_varejo:,.2f}")
+                st.write(f"• **Projeção setor**: R$ {media_diaria_varejo * dias_uteis:,.2f}")
+            else:
+                st.write("• Dados não disponíveis")
     
     # === 4. RESUMO ESTRATÉGICO ===
     st.markdown("---")
     st.markdown("### 📈 Resumo Estratégico")
     
-    col_resumo1, col_resumo2 = st.columns(2)
+    # Calcular variação com ontem
+    var_ontem = 0
+    if vendas_hoje_atacado and 'var_ontem' in vendas_hoje_atacado:
+        var_ontem = vendas_hoje_atacado['var_ontem']['faturamento']
     
-    with col_resumo1:
+    # Resumo estratégico - Layout responsivo
+    if layout_mode == "📱 Mobile":
+        # Mobile: seções empilhadas
         st.markdown("**💪 PONTOS FORTES:**")
         pontos_fortes = []
         
         if percent_meta > 10:
-            pontos_fortes.append("🎯 Projeção acima da meta do atacado")
+            pontos_fortes.append("🎯 Projeção acima da meta")
         
         if tem_varejo and fat_varejo > 0:
-            pontos_fortes.append("🏪 Varejo contribuindo para receita")
+            pontos_fortes.append("🏪 Varejo contribuindo")
         
         if tem_atacado and qtd_clientes_novos >= 2:
-            pontos_fortes.append("👥 Boa captação de clientes novos")
+            pontos_fortes.append("👥 Boa captação de clientes")
         
         if var_ontem > 5:
             pontos_fortes.append("📈 Crescimento vs ontem")
@@ -2554,15 +2814,48 @@ def dashboard_geral_consolidado(df_atacado, df_varejo, layout_mode):
         if not pontos_fortes:
             pontos_fortes.append("💼 Operação funcionando")
         
-        for ponto in pontos_fortes:
+        # Mostrar apenas os 3 primeiros no mobile
+        for ponto in pontos_fortes[:3]:
             st.success(ponto)
-    
-    with col_resumo2:
-        st.markdown("**⚠️ PONTOS DE ATENÇÃO:**")
+        
+        st.markdown("**⚠️ ATENÇÃO:**")
         pontos_atencao = []
         
         if percent_meta < -10:
             pontos_atencao.append("📉 Projeção abaixo da meta")
+    
+    else:
+        # Desktop: layout original com colunas
+        col_resumo1, col_resumo2 = st.columns(2)
+        
+        with col_resumo1:
+            st.markdown("**💪 PONTOS FORTES:**")
+            pontos_fortes = []
+            
+            if percent_meta > 10:
+                pontos_fortes.append("🎯 Projeção acima da meta do atacado")
+            
+            if tem_varejo and fat_varejo > 0:
+                pontos_fortes.append("🏪 Varejo contribuindo para receita")
+            
+            if tem_atacado and qtd_clientes_novos >= 2:
+                pontos_fortes.append("👥 Boa captação de clientes novos")
+            
+            if var_ontem > 5:
+                pontos_fortes.append("📈 Crescimento vs ontem")
+            
+            if not pontos_fortes:
+                pontos_fortes.append("💼 Operação funcionando")
+            
+            for ponto in pontos_fortes:
+                st.success(ponto)
+        
+        with col_resumo2:
+            st.markdown("**⚠️ PONTOS DE ATENÇÃO:**")
+            pontos_atencao = []
+            
+            if percent_meta < -10:
+                pontos_atencao.append("📉 Projeção abaixo da meta")
         
         if tem_atacado and qtd_clientes_novos < 2:
             pontos_atencao.append("👥 Poucos clientes novos hoje")
@@ -2588,8 +2881,15 @@ def dashboard_vendas(df, layout_mode):
     st.markdown("*Análise completa de vendas e faturamento*")
     
     # === SISTEMA DE ABAS ===
+    # Gerar título dinâmico para a aba
+    data_atacado = obter_data_mais_recente_str(df)
+    if data_atacado:
+        titulo_aba = f"🔥 Vendas de {data_atacado}"
+    else:
+        titulo_aba = "🔥 Vendas de Hoje"
+    
     tab_hoje, tab_historico, tab_ticket, tab_avancadas = st.tabs([
-        "🔥 Vendas de Hoje", 
+        titulo_aba, 
         "📈 Análise Histórica", 
         "💰 Central Ticket Médio",
         "📊 Métricas Avançadas"
@@ -3263,58 +3563,355 @@ def dashboard_vendas(df, layout_mode):
                     help="% do faturamento do maior cliente"
                 )
             
-            # Botão separado para mostrar clientes dependentes
-            st.markdown("**👥 Detalhamento dos Clientes:**")
+            # Botão separado para análise estratégica
+            st.markdown("**👥 Análise Estratégica dos Clientes:**")
             
-            if st.button("🔍 Ver Top 10 Clientes Dependentes", key="btn_clientes_dependentes", use_container_width=True):
-                st.session_state.mostrar_clientes = True
+            # Layout responsivo para botões
+            if layout_mode == "📱 Mobile":
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("🔍 Ver Clientes", key="btn_clientes_dependentes", use_container_width=True):
+                        st.session_state.mostrar_clientes = True
+                with col_btn2:
+                    if st.button("📊 Ampliar Mix", key="btn_ampliar_mix", use_container_width=True):
+                        st.session_state.mostrar_estrategias = True
+            else:
+                col_btn1, col_btn2, col_btn3 = st.columns(3)
+                with col_btn1:
+                    if st.button("🔍 Ver Top 10 Clientes", key="btn_clientes_dependentes", use_container_width=True):
+                        st.session_state.mostrar_clientes = True
+                with col_btn2:
+                    if st.button("📊 Estratégias para Ampliar Mix", key="btn_ampliar_mix", use_container_width=True):
+                        st.session_state.mostrar_estrategias = True
+                with col_btn3:
+                    if st.button("📈 Perfil de Compras", key="btn_perfil_compras", use_container_width=True):
+                        st.session_state.mostrar_perfil = True
             
-            # Mostrar clientes se botão foi clicado
+            # === ANÁLISE DE CLIENTES DEPENDENTES ===
             if st.session_state.get('mostrar_clientes', False):
                 with st.container():
-                    st.markdown("#### 🔍 Top 10 Clientes Dependentes")
+                    st.markdown("#### 🔍 Top 10 Clientes - Análise de Dependência")
                     
-                    # Botão para fechar
-                    if st.button("❌ Fechar", key="btn_fechar_clientes"):
-                        st.session_state.mostrar_clientes = False
-                        st.rerun()
+                    # Botão para fechar - responsivo
+                    if layout_mode == "📱 Mobile":
+                        if st.button("❌ Fechar", key="btn_fechar_clientes", use_container_width=True):
+                            st.session_state.mostrar_clientes = False
+                            st.rerun()
+                    else:
+                        col_fecha, _, _ = st.columns([1, 2, 2])
+                        with col_fecha:
+                            if st.button("❌ Fechar", key="btn_fechar_clientes"):
+                                st.session_state.mostrar_clientes = False
+                                st.rerun()
                     
                     top_clientes = vendas_por_cliente.head(10).reset_index()
                     
-                    # Tabela formatada ao invés de colunas problemáticas
+                    # Análise detalhada de cada cliente
                     for i, cliente in top_clientes.iterrows():
-                        # Truncar nome do cliente se muito longo
                         nome_cliente = cliente['Nome_Cliente']
-                        if len(nome_cliente) > 40:
-                            nome_cliente = nome_cliente[:40] + "..."
+                        if len(nome_cliente) > 45:
+                            nome_cliente = nome_cliente[:45] + "..."
                         
-                        # Determinar cor do risco
+                        # Calcular métricas avançadas do cliente
+                        vendas_cliente = df_temp[df_temp['Nome_Cliente'] == cliente['Nome_Cliente']]
+                        
+                        # Análise temporal
+                        datas_compra = pd.to_datetime(vendas_cliente['Data_Competencia']).dt.date
+                        primeiro_dia = datas_compra.min()
+                        ultimo_dia = datas_compra.max()
+                        dias_ativo = (ultimo_dia - primeiro_dia).days + 1
+                        frequencia_compra = len(vendas_cliente) / max(dias_ativo, 1) * 30  # compras por mês
+                        
+                        # Ticket médio e variabilidade
+                        ticket_medio = vendas_cliente['Total_Venda'].mean()
+                        ticket_variacao = vendas_cliente['Total_Venda'].std() / ticket_medio * 100 if ticket_medio > 0 else 0
+                        
+                        # Últimas compras
+                        dias_ultima_compra = (pd.Timestamp.now().date() - ultimo_dia).days
+                        
+                        # Status de risco
                         if cliente['Percentual_Faturamento'] > 30:
-                            status = "🚨 Alto Risco"
-                            cor = "error"
+                            status = "🚨 RISCO CRÍTICO"
+                            cor_status = "🔴"
+                            prioridade = "MÁXIMA"
                         elif cliente['Percentual_Faturamento'] > 15:
-                            status = "⚠️ Atenção"
-                            cor = "warning"
+                            status = "⚠️ ALTA DEPENDÊNCIA"
+                            cor_status = "🟡" 
+                            prioridade = "ALTA"
+                        elif cliente['Percentual_Faturamento'] > 8:
+                            status = "📊 MONITORAR"
+                            cor_status = "🟠"
+                            prioridade = "MÉDIA"
                         else:
-                            status = "✅ Saudável"
-                            cor = "success"
+                            status = "✅ SAUDÁVEL"
+                            cor_status = "🟢"
+                            prioridade = "BAIXA"
                         
-                        # Exibir informações de forma mais limpa
-                        st.markdown(f"""
-                        **{i+1}º {nome_cliente}**  
-                        💰 R$ {cliente['Faturamento_Total']:,.2f} ({cliente['Percentual_Faturamento']:.1f}%) - {status}
-                        """)
+                        # Layout responsivo para cada cliente
+                        with st.expander(f"{cor_status} **{i+1}º** {nome_cliente} - {cliente['Percentual_Faturamento']:.1f}% ({status})", expanded=i==0):
+                            if layout_mode == "📱 Mobile":
+                                # Mobile: layout empilhado
+                                st.markdown(f"**💰 Faturamento:** R$ {cliente['Faturamento_Total']:,.0f}")
+                                st.markdown(f"**📊 Participação:** {cliente['Percentual_Faturamento']:.1f}% do total")
+                                st.markdown(f"**🛒 Compras:** {cliente['Qtd_Vendas']} vendas")
+                                st.markdown(f"**🎯 Ticket Médio:** R$ {ticket_medio:,.0f}")
+                                
+                                st.markdown("---")
+                                st.markdown(f"**📅 Frequência:** {frequencia_compra:.1f} compras/mês")
+                                st.markdown(f"**⏱️ Última compra:** {dias_ultima_compra} dias atrás")
+                                st.markdown(f"**📈 Variação ticket:** {ticket_variacao:.0f}%")
+                                st.markdown(f"**🚨 Prioridade:** {prioridade}")
+                                
+                            else:
+                                # Desktop: layout em colunas
+                                col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                                
+                                with col_met1:
+                                    st.metric("💰 Faturamento", f"R$ {cliente['Faturamento_Total']:,.0f}", 
+                                            f"{cliente['Percentual_Faturamento']:.1f}% do total")
+                                
+                                with col_met2:
+                                    st.metric("🛒 Compras", f"{cliente['Qtd_Vendas']}", 
+                                            f"{frequencia_compra:.1f}/mês")
+                                
+                                with col_met3:
+                                    st.metric("🎯 Ticket Médio", f"R$ {ticket_medio:,.0f}", 
+                                            f"±{ticket_variacao:.0f}%")
+                                
+                                with col_met4:
+                                    st.metric("⏱️ Última Compra", f"{dias_ultima_compra} dias", 
+                                            f"Prioridade: {prioridade}")
+                            
+                            # Recomendações específicas
+                            st.markdown("**💡 Ações Recomendadas:**")
+                            
+                            if cliente['Percentual_Faturamento'] > 30:
+                                st.error("🚨 **URGENTE**: Diversificar imediatamente! Cliente representa risco crítico.")
+                                st.markdown("• Oferecer novos produtos/serviços")
+                                st.markdown("• Negociar contratos de longo prazo")
+                                st.markdown("• Buscar novos clientes para reduzir dependência")
+                                
+                            elif cliente['Percentual_Faturamento'] > 15:
+                                st.warning("⚠️ **ATENÇÃO**: Monitorar e ampliar relacionamento")
+                                st.markdown("• Apresentar catálogo completo")
+                                st.markdown("• Identificar necessidades não atendidas")
+                                st.markdown("• Fortalecer relacionamento comercial")
+                                
+                            else:
+                                st.success("✅ **OPORTUNIDADE**: Cliente saudável para crescimento")
+                                st.markdown("• Explorar potencial de crescimento")
+                                st.markdown("• Cross-selling de produtos relacionados")
                     
+                    # Resumo da análise
                     st.markdown("---")
-                    st.markdown("**📊 Interpretação dos Riscos:**")
-                    col_leg1, col_leg2, col_leg3 = st.columns(3)
+                    st.markdown("### 📊 Resumo Estratégico")
                     
-                    with col_leg1:
-                        st.error("🚨 **>30%**: Risco alto - diversificar urgente")
-                    with col_leg2:
-                        st.warning("⚠️ **15-30%**: Monitorar dependência")
-                    with col_leg3:
-                        st.success("✅ **<15%**: Situação saudável")
+                    clientes_risco_critico = sum(1 for _, c in top_clientes.iterrows() if c['Percentual_Faturamento'] > 30)
+                    clientes_alta_dependencia = sum(1 for _, c in top_clientes.iterrows() if 15 <= c['Percentual_Faturamento'] <= 30)
+                    
+                    if layout_mode == "📱 Mobile":
+                        st.error(f"🚨 **{clientes_risco_critico}** clientes em risco crítico")
+                        st.warning(f"⚠️ **{clientes_alta_dependencia}** clientes com alta dependência")
+                        st.info(f"💡 **{10 - clientes_risco_critico - clientes_alta_dependencia}** clientes com potencial de crescimento")
+                    else:
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.error(f"🚨 **Risco Crítico**: {clientes_risco_critico} clientes")
+                        with col_res2:
+                            st.warning(f"⚠️ **Alta Dependência**: {clientes_alta_dependencia} clientes")
+                        with col_res3:
+                            st.success(f"📈 **Potencial Crescimento**: {10 - clientes_risco_critico - clientes_alta_dependencia} clientes")
+            
+            # === ESTRATÉGIAS PARA AMPLIAR MIX ===
+            if st.session_state.get('mostrar_estrategias', False):
+                with st.container():
+                    st.markdown("#### 📊 Estratégias para Ampliar Mix de Produtos")
+                    
+                    # Botão para fechar
+                    if st.button("❌ Fechar Estratégias", key="btn_fechar_estrategias"):
+                        st.session_state.mostrar_estrategias = False
+                        st.rerun()
+                    
+                    # Análise do mix atual por cliente
+                    st.markdown("##### 🎯 Oportunidades de Cross-Selling")
+                    
+                    # Para cada cliente do top 5, analisar seu perfil
+                    top_5_clientes = vendas_por_cliente.head(5).reset_index()
+                    
+                    for i, cliente in top_5_clientes.iterrows():
+                        vendas_cliente = df_temp[df_temp['Nome_Cliente'] == cliente['Nome_Cliente']]
+                        
+                        # Análise de produtos mais comprados pelo cliente
+                        if 'Produto' in vendas_cliente.columns:
+                            produtos_cliente = vendas_cliente.groupby('Produto')['Total_Venda'].agg(['sum', 'count']).sort_values('sum', ascending=False)
+                        else:
+                            # Se não tem coluna produto, analisar por valor
+                            produtos_cliente = vendas_cliente.groupby('Total_Venda')['Total_Venda'].count().sort_values(ascending=False)
+                        
+                        nome_cliente = cliente['Nome_Cliente']
+                        if len(nome_cliente) > 30:
+                            nome_cliente = nome_cliente[:30] + "..."
+                        
+                        with st.expander(f"📊 **{i+1}º** {nome_cliente} - Análise de Mix"):
+                            col_atual, col_oportunidade = st.columns(2)
+                            
+                            with col_atual:
+                                st.markdown("**📋 Perfil Atual:**")
+                                st.markdown(f"• **Total gasto**: R$ {cliente['Faturamento_Total']:,.0f}")
+                                st.markdown(f"• **Nº de compras**: {cliente['Qtd_Vendas']}")
+                                st.markdown(f"• **Ticket médio**: R$ {cliente['Faturamento_Total']/cliente['Qtd_Vendas']:,.0f}")
+                                
+                                # Frequência de compra
+                                try:
+                                    # Se Data_Competencia é datetime
+                                    if pd.api.types.is_datetime64_any_dtype(vendas_cliente['Data_Competencia']):
+                                        vendas_por_mes = vendas_cliente.groupby(vendas_cliente['Data_Competencia'].dt.strftime('%m/%Y'))['Total_Venda'].count()
+                                    else:
+                                        # Se Data_Competencia é string
+                                        vendas_por_mes = vendas_cliente.groupby(vendas_cliente['Data_Competencia'].str[3:10])['Total_Venda'].count()
+                                    freq_media = vendas_por_mes.mean() if len(vendas_por_mes) > 0 else 0
+                                except:
+                                    freq_media = 0
+                                st.markdown(f"• **Frequência**: {freq_media:.1f} compras/mês")
+                            
+                            with col_oportunidade:
+                                st.markdown("**💡 Oportunidades:**")
+                                
+                                # Sugestões baseadas no perfil
+                                if cliente['Faturamento_Total'] > vendas_por_cliente['Faturamento_Total'].median():
+                                    st.success("🎯 **Cliente Premium**: Expandir linha premium")
+                                    st.markdown("• Produtos de maior valor agregado")
+                                    st.markdown("• Serviços exclusivos")
+                                    st.markdown("• Pacotes personalizados")
+                                
+                                if cliente['Qtd_Vendas'] < vendas_por_cliente['Qtd_Vendas'].median():
+                                    st.info("📈 **Aumentar Frequência**: Produtos de consumo")
+                                    st.markdown("• Produtos de reposição")
+                                    st.markdown("• Contratos mensais")
+                                    st.markdown("• Produtos complementares")
+                                
+                                if freq_media < 2:
+                                    st.warning("⚡ **Ativar Cliente**: Promoções direcionadas")
+                                    st.markdown("• Ofertas personalizadas")
+                                    st.markdown("• Demonstrações de produto")
+                                    st.markdown("• Atendimento comercial ativo")
+                    
+                    # Estratégias gerais
+                    st.markdown("---")
+                    st.markdown("##### 🚀 Estratégias Gerais para Ampliar Mix")
+                    
+                    estrategias_tabs = st.tabs(["🎯 Imediatas", "📈 Médio Prazo", "🚀 Longo Prazo"])
+                    
+                    with estrategias_tabs[0]:
+                        st.markdown("**🎯 Ações Imediatas (1-30 dias):**")
+                        st.success("✅ **Apresentação de catálogo completo** aos top 10 clientes")
+                        st.success("✅ **Ligação comercial ativa** para identificar necessidades")
+                        st.success("✅ **Ofertas casadas** para produtos complementares")
+                        st.success("✅ **Desconto progressivo** por volume/mix")
+                        
+                        st.markdown("**📊 KPIs a acompanhar:**")
+                        st.markdown("• Nº de produtos por cliente")
+                        st.markdown("• Ticket médio por transação")
+                        st.markdown("• Frequência de compra")
+                    
+                    with estrategias_tabs[1]:
+                        st.markdown("**📈 Estratégias de Médio Prazo (1-6 meses):**")
+                        st.info("📋 **Programa de fidelidade** com benefícios por mix")
+                        st.info("📋 **Treinamento da equipe** para cross-selling")
+                        st.info("📋 **Sistema de CRM** para histórico de preferências")
+                        st.info("📋 **Campanhas segmentadas** por perfil de cliente")
+                        
+                        st.markdown("**🎯 Metas sugeridas:**")
+                        st.markdown("• +30% no mix médio por cliente")
+                        st.markdown("• +20% na frequência de compra")
+                        st.markdown("• +15% no ticket médio")
+                    
+                    with estrategias_tabs[2]:
+                        st.markdown("**🚀 Visão de Longo Prazo (6+ meses):**")
+                        st.warning("🔮 **Diversificação de portfólio** para reduzir dependência")
+                        st.warning("🔮 **Parcerias estratégicas** para ampliar oferta")
+                        st.warning("🔮 **Desenvolvimento de produtos** específicos")
+                        st.warning("🔮 **Expansão geográfica** para novos mercados")
+                        
+                        st.markdown("**🎯 Objetivo final:**")
+                        st.markdown("• Nenhum cliente > 15% do faturamento")
+                        st.markdown("• Base de clientes 3x maior")
+                        st.markdown("• Mix médio 2x mais diversificado")
+            
+            # === PERFIL DE COMPRAS ===
+            if st.session_state.get('mostrar_perfil', False):
+                with st.container():
+                    st.markdown("#### 📈 Perfil de Compras - Análise Temporal")
+                    
+                    if st.button("❌ Fechar Perfil", key="btn_fechar_perfil"):
+                        st.session_state.mostrar_perfil = False
+                        st.rerun()
+                    
+                    # Análise de sazonalidade dos top clientes
+                    top_3_clientes = vendas_por_cliente.head(3).reset_index()
+                    
+                    for i, cliente in top_3_clientes.iterrows():
+                        vendas_cliente = df_temp[df_temp['Nome_Cliente'] == cliente['Nome_Cliente']].copy()
+                        vendas_cliente['Mes'] = pd.to_datetime(vendas_cliente['Data_Competencia']).dt.strftime('%m/%Y')
+                        
+                        nome_cliente = cliente['Nome_Cliente']
+                        if len(nome_cliente) > 35:
+                            nome_cliente = nome_cliente[:35] + "..."
+                        
+                        with st.expander(f"📊 {nome_cliente} - Padrão Temporal"):
+                            # Vendas por mês
+                            vendas_mensais = vendas_cliente.groupby('Mes').agg({
+                                'Total_Venda': ['sum', 'count', 'mean']
+                            }).round(2)
+                            
+                            if len(vendas_mensais) > 1:
+                                col_graf, col_insights = st.columns([2, 1])
+                                
+                                with col_graf:
+                                    # Gráfico simples
+                                    st.markdown("**📈 Faturamento Mensal:**")
+                                    for mes, dados in vendas_mensais.iterrows():
+                                        fat_mes = dados[('Total_Venda', 'sum')]
+                                        qtd_mes = dados[('Total_Venda', 'count')]
+                                        st.markdown(f"• **{mes}**: R$ {fat_mes:,.0f} ({qtd_mes} compras)")
+                                
+                                with col_insights:
+                                    st.markdown("**💡 Insights:**")
+                                    
+                                    # Variação mensal
+                                    fat_medio = vendas_mensais[('Total_Venda', 'sum')].mean()
+                                    mes_maior = vendas_mensais[('Total_Venda', 'sum')].idxmax()
+                                    mes_menor = vendas_mensais[('Total_Venda', 'sum')].idxmin()
+                                    
+                                    st.markdown(f"🏆 **Melhor mês**: {mes_maior}")
+                                    st.markdown(f"📉 **Menor mês**: {mes_menor}")
+                                    st.markdown(f"📊 **Média mensal**: R$ {fat_medio:,.0f}")
+                                    
+                                    # Regularidade
+                                    coef_variacao = vendas_mensais[('Total_Venda', 'sum')].std() / fat_medio * 100
+                                    if coef_variacao < 30:
+                                        st.success("✅ Cliente regular")
+                                    elif coef_variacao < 60:
+                                        st.warning("⚠️ Cliente sazonal")
+                                    else:
+                                        st.error("🚨 Cliente irregular")
+                            else:
+                                st.info("📊 Dados insuficientes para análise temporal")
+                    
+                    # Resumo de padrões
+                    st.markdown("---")
+                    st.markdown("##### 🎯 Conclusões e Próximos Passos")
+                    
+                    st.success("**✅ Clientes identificados e analisados**")
+                    st.success("**✅ Perfis de compra mapeados**") 
+                    st.success("**✅ Oportunidades de mix identificadas**")
+                    
+                    st.markdown("**🚀 Próximos passos recomendados:**")
+                    st.markdown("1. **Contato comercial** com top 5 clientes")
+                    st.markdown("2. **Apresentação de produtos** não comprados")
+                    st.markdown("3. **Propostas personalizadas** de mix")
+                    st.markdown("4. **Acompanhamento semanal** dos resultados")
+                    st.markdown("5. **Monitoramento da dependência** mensal")
             
             # Alertas de concentração
             st.markdown("**🚨 Alertas de Risco:**")
@@ -3637,6 +4234,340 @@ def dashboard_vendas(df, layout_mode):
                 if i <= 6:  # Mostrar até 6 oportunidades principais
                     st.info(f"{i}. {oportunidade}")
             
+            # === 5. ANÁLISE TEMPORAL DAS VENDAS ===
+            st.markdown("---")
+            st.markdown("#### 📈 Análise Temporal das Vendas")
+            st.caption("*Tendências, picos, quedas e sazonalidade*")
+            
+            # Preparar dados para análise temporal
+            vendas_temporais = df_temp.copy()
+            vendas_temporais['Data'] = vendas_temporais['Data_Competencia'].dt.date
+            
+            # Agrupar vendas por data
+            vendas_por_dia = vendas_temporais.groupby('Data').agg({
+                'Total_Venda': ['sum', 'count', 'mean'],
+                'Nome_Cliente': 'nunique'
+            }).round(2)
+            
+            # Flatten columns
+            vendas_por_dia.columns = ['Faturamento_Dia', 'Qtd_Vendas_Dia', 'Ticket_Medio_Dia', 'Clientes_Unicos_Dia']
+            vendas_por_dia = vendas_por_dia.reset_index()
+            
+            if len(vendas_por_dia) >= 5:  # Só fazer análise se tiver dados suficientes
+                
+                # === GRÁFICO TEMPORAL ===
+                st.markdown("##### 📊 Evolução Temporal das Vendas")
+                
+                # Criar gráfico temporal
+                import plotly.express as px
+                import plotly.graph_objects as go
+                from plotly.subplots import make_subplots
+                
+                # Criar gráfico com duas linhas: Faturamento e Quantidade
+                fig_temporal = make_subplots(
+                    rows=2, cols=1,
+                    subplot_titles=('💰 Faturamento Diário', '🛒 Quantidade de Vendas'),
+                    vertical_spacing=0.1,
+                    shared_xaxes=True
+                )
+                
+                # Linha de faturamento
+                fig_temporal.add_trace(
+                    go.Scatter(
+                        x=vendas_por_dia['Data'],
+                        y=vendas_por_dia['Faturamento_Dia'],
+                        mode='lines+markers',
+                        name='Faturamento',
+                        line=dict(color='#1f77b4', width=3),
+                        marker=dict(size=6),
+                        hovertemplate='<b>%{x}</b><br>Faturamento: R$ %{y:,.0f}<extra></extra>'
+                    ),
+                    row=1, col=1
+                )
+                
+                # Linha de quantidade
+                fig_temporal.add_trace(
+                    go.Scatter(
+                        x=vendas_por_dia['Data'],
+                        y=vendas_por_dia['Qtd_Vendas_Dia'],
+                        mode='lines+markers',
+                        name='Qtd Vendas',
+                        line=dict(color='#ff7f0e', width=3),
+                        marker=dict(size=6),
+                        hovertemplate='<b>%{x}</b><br>Vendas: %{y}<extra></extra>'
+                    ),
+                    row=2, col=1
+                )
+                
+                # === IDENTIFICAR PICOS E QUEDAS ===
+                media_faturamento = vendas_por_dia['Faturamento_Dia'].mean()
+                desvio_faturamento = vendas_por_dia['Faturamento_Dia'].std()
+                
+                # Definir limites para picos e quedas
+                limite_pico = media_faturamento + (1.5 * desvio_faturamento)
+                limite_queda = media_faturamento - (1.5 * desvio_faturamento)
+                limite_queda = max(limite_queda, 0)  # Não pode ser negativo
+                
+                # Identificar picos e quedas
+                picos = vendas_por_dia[vendas_por_dia['Faturamento_Dia'] >= limite_pico]
+                quedas = vendas_por_dia[vendas_por_dia['Faturamento_Dia'] <= limite_queda]
+                
+                # Adicionar marcadores de picos
+                if not picos.empty:
+                    fig_temporal.add_trace(
+                        go.Scatter(
+                            x=picos['Data'],
+                            y=picos['Faturamento_Dia'],
+                            mode='markers',
+                            name='🚀 Picos',
+                            marker=dict(size=12, color='green', symbol='triangle-up'),
+                            hovertemplate='<b>PICO - %{x}</b><br>R$ %{y:,.0f}<extra></extra>'
+                        ),
+                        row=1, col=1
+                    )
+                
+                # Adicionar marcadores de quedas
+                if not quedas.empty:
+                    fig_temporal.add_trace(
+                        go.Scatter(
+                            x=quedas['Data'],
+                            y=quedas['Faturamento_Dia'],
+                            mode='markers',
+                            name='📉 Quedas',
+                            marker=dict(size=12, color='red', symbol='triangle-down'),
+                            hovertemplate='<b>QUEDA - %{x}</b><br>R$ %{y:,.0f}<extra></extra>'
+                        ),
+                        row=1, col=1
+                    )
+                
+                # Adicionar linha de média
+                fig_temporal.add_hline(
+                    y=media_faturamento, 
+                    line_dash="dash", 
+                    line_color="gray",
+                    annotation_text=f"Média: R$ {media_faturamento:,.0f}",
+                    row=1, col=1
+                )
+                
+                # Configurar layout do gráfico
+                fig_temporal.update_layout(
+                    height=600,
+                    showlegend=True,
+                    title_text="📈 Análise Temporal - Picos e Quedas",
+                    title_x=0.5
+                )
+                
+                # Aplicar configuração responsiva
+                fig_temporal = config_grafico_mobile(fig_temporal, layout_mode)
+                
+                # Exibir gráfico
+                st.plotly_chart(fig_temporal, use_container_width=True)
+                
+                # === ANÁLISE DOS PERÍODOS ===
+                st.markdown("##### 🏆 Análise dos Melhores e Piores Períodos")
+                
+                # Identificar melhores e piores dias
+                vendas_ordenadas = vendas_por_dia.sort_values('Faturamento_Dia', ascending=False)
+                top_5_dias = vendas_ordenadas.head(5)
+                bottom_5_dias = vendas_ordenadas.tail(5)
+                
+                # Layout responsivo para análise de períodos
+                if layout_mode == "📱 Mobile":
+                    # Mobile: seções empilhadas
+                    st.markdown("**🏆 TOP 5 MELHORES DIAS:**")
+                    for i, (_, dia) in enumerate(top_5_dias.iterrows(), 1):
+                        data_str = dia['Data'].strftime('%d/%m/%Y')
+                        dia_semana = dia['Data'].strftime('%A')
+                        st.success(f"**{i}º** {data_str} ({dia_semana}): R$ {dia['Faturamento_Dia']:,.0f} - {dia['Qtd_Vendas_Dia']} vendas")
+                    
+                    st.markdown("**📉 TOP 5 PIORES DIAS:**")
+                    for i, (_, dia) in enumerate(bottom_5_dias.iterrows(), 1):
+                        data_str = dia['Data'].strftime('%d/%m/%Y')
+                        dia_semana = dia['Data'].strftime('%A')
+                        st.error(f"**{i}º** {data_str} ({dia_semana}): R$ {dia['Faturamento_Dia']:,.0f} - {dia['Qtd_Vendas_Dia']} vendas")
+                        
+                else:
+                    # Desktop: layout em colunas
+                    col_melhores, col_piores = st.columns(2)
+                    
+                    with col_melhores:
+                        st.markdown("**🏆 TOP 5 MELHORES DIAS:**")
+                        for i, (_, dia) in enumerate(top_5_dias.iterrows(), 1):
+                            data_str = dia['Data'].strftime('%d/%m/%Y')
+                            dia_semana = dia['Data'].strftime('%A')
+                            st.success(f"**{i}º** {data_str} ({dia_semana})")
+                            st.markdown(f"💰 R$ {dia['Faturamento_Dia']:,.2f}")
+                            st.markdown(f"🛒 {dia['Qtd_Vendas_Dia']} vendas")
+                            st.markdown("---")
+                    
+                    with col_piores:
+                        st.markdown("**📉 TOP 5 PIORES DIAS:**")
+                        for i, (_, dia) in enumerate(bottom_5_dias.iterrows(), 1):
+                            data_str = dia['Data'].strftime('%d/%m/%Y')
+                            dia_semana = dia['Data'].strftime('%A')
+                            st.error(f"**{i}º** {data_str} ({dia_semana})")
+                            st.markdown(f"💰 R$ {dia['Faturamento_Dia']:,.2f}")
+                            st.markdown(f"🛒 {dia['Qtd_Vendas_Dia']} vendas")
+                            st.markdown("---")
+                
+                # === ANÁLISE POR DIA DA SEMANA ===
+                st.markdown("##### 📅 Performance por Dia da Semana")
+                
+                # Adicionar dia da semana
+                vendas_por_dia_copia = vendas_por_dia.copy()
+                vendas_por_dia_copia['Dia_Semana'] = pd.to_datetime(vendas_por_dia_copia['Data']).dt.day_name()
+                vendas_por_dia_copia['Dia_Semana_Num'] = pd.to_datetime(vendas_por_dia_copia['Data']).dt.dayofweek
+                
+                # Ordenar por dia da semana (Segunda = 0)
+                dias_semana_pt = {
+                    'Monday': 'Segunda-feira',
+                    'Tuesday': 'Terça-feira', 
+                    'Wednesday': 'Quarta-feira',
+                    'Thursday': 'Quinta-feira',
+                    'Friday': 'Sexta-feira',
+                    'Saturday': 'Sábado',
+                    'Sunday': 'Domingo'
+                }
+                
+                vendas_por_dia_copia['Dia_Semana_PT'] = vendas_por_dia_copia['Dia_Semana'].map(dias_semana_pt)
+                
+                # Agrupar por dia da semana
+                performance_semanal = vendas_por_dia_copia.groupby(['Dia_Semana_Num', 'Dia_Semana_PT']).agg({
+                    'Faturamento_Dia': ['mean', 'sum', 'count'],
+                    'Qtd_Vendas_Dia': ['mean', 'sum'],
+                    'Clientes_Unicos_Dia': 'mean'
+                }).round(2)
+                
+                # Flatten columns
+                performance_semanal.columns = ['Fat_Medio', 'Fat_Total', 'Dias_Trabalhados', 'Vendas_Media', 'Vendas_Total', 'Clientes_Medio']
+                performance_semanal = performance_semanal.reset_index().sort_values('Dia_Semana_Num')
+                
+                # Mostrar performance semanal
+                for _, linha in performance_semanal.iterrows():
+                    if linha['Dias_Trabalhados'] > 0:  # Só mostrar dias que tiveram vendas
+                        dia_nome = linha['Dia_Semana_PT']
+                        
+                        # Determinar performance relativa
+                        if linha['Fat_Medio'] > media_faturamento * 1.2:
+                            status = "🚀 EXCELENTE"
+                            cor = "success"
+                        elif linha['Fat_Medio'] > media_faturamento:
+                            status = "✅ BOM"
+                            cor = "success"
+                        elif linha['Fat_Medio'] > media_faturamento * 0.8:
+                            status = "⚠️ REGULAR"
+                            cor = "warning"
+                        else:
+                            status = "📉 FRACO"
+                            cor = "error"
+                        
+                        # Exibir com layout responsivo
+                        if layout_mode == "📱 Mobile":
+                            if cor == "success":
+                                st.success(f"**{dia_nome}** ({status}): R$ {linha['Fat_Medio']:,.0f}/dia - {linha['Vendas_Media']:.1f} vendas")
+                            elif cor == "warning":
+                                st.warning(f"**{dia_nome}** ({status}): R$ {linha['Fat_Medio']:,.0f}/dia - {linha['Vendas_Media']:.1f} vendas")
+                            else:
+                                st.error(f"**{dia_nome}** ({status}): R$ {linha['Fat_Medio']:,.0f}/dia - {linha['Vendas_Media']:.1f} vendas")
+                        else:
+                            with st.expander(f"{dia_nome} - {status}"):
+                                col_sem1, col_sem2, col_sem3 = st.columns(3)
+                                with col_sem1:
+                                    st.metric("💰 Faturamento Médio", f"R$ {linha['Fat_Medio']:,.2f}")
+                                with col_sem2:
+                                    st.metric("🛒 Vendas Médias", f"{linha['Vendas_Media']:.1f}")
+                                with col_sem3:
+                                    st.metric("👥 Clientes Médios", f"{linha['Clientes_Medio']:.1f}")
+                
+                # === INSIGHTS E RECOMENDAÇÕES ===
+                st.markdown("##### 💡 Insights e Recomendações")
+                
+                # Calcular insights automáticos
+                insights_temporais = []
+                
+                # Melhor dia da semana
+                melhor_dia = performance_semanal.loc[performance_semanal['Fat_Medio'].idxmax(), 'Dia_Semana_PT']
+                pior_dia = performance_semanal.loc[performance_semanal['Fat_Medio'].idxmin(), 'Dia_Semana_PT']
+                
+                insights_temporais.append(f"🏆 **MELHOR DIA**: {melhor_dia} é seu dia mais forte")
+                insights_temporais.append(f"📉 **PIOR DIA**: {pior_dia} precisa de atenção especial")
+                
+                # Análise de picos
+                if not picos.empty:
+                    qtd_picos = len(picos)
+                    insights_temporais.append(f"🚀 **PICOS IDENTIFICADOS**: {qtd_picos} dias de performance excepcional")
+                    
+                    # Padrão dos picos
+                    picos_dias_semana = pd.to_datetime(picos['Data']).dt.day_name().value_counts()
+                    if len(picos_dias_semana) > 0:
+                        dia_mais_picos = picos_dias_semana.index[0]
+                        dia_mais_picos_pt = dias_semana_pt.get(dia_mais_picos, dia_mais_picos)
+                        insights_temporais.append(f"📊 **PADRÃO DE PICOS**: Concentrados em {dia_mais_picos_pt}")
+                
+                # Análise de quedas
+                if not quedas.empty:
+                    qtd_quedas = len(quedas)
+                    insights_temporais.append(f"⚠️ **QUEDAS IDENTIFICADAS**: {qtd_quedas} dias de baixa performance")
+                
+                # Variabilidade
+                coef_var_temporal = (desvio_faturamento / media_faturamento * 100) if media_faturamento > 0 else 0
+                if coef_var_temporal > 60:
+                    insights_temporais.append("📊 **ALTA VARIABILIDADE**: Vendas muito inconsistentes - buscar estabilidade")
+                elif coef_var_temporal < 30:
+                    insights_temporais.append("✅ **BOA CONSISTÊNCIA**: Vendas relativamente estáveis")
+                
+                # Tendência geral
+                if len(vendas_por_dia) >= 10:
+                    # Calcular tendência simples (primeiros 50% vs últimos 50%)
+                    meio = len(vendas_por_dia) // 2
+                    primeira_metade = vendas_por_dia.head(meio)['Faturamento_Dia'].mean()
+                    segunda_metade = vendas_por_dia.tail(meio)['Faturamento_Dia'].mean()
+                    
+                    if segunda_metade > primeira_metade * 1.1:
+                        insights_temporais.append("📈 **TENDÊNCIA POSITIVA**: Vendas melhorando ao longo do tempo")
+                    elif segunda_metade < primeira_metade * 0.9:
+                        insights_temporais.append("📉 **TENDÊNCIA NEGATIVA**: Vendas declinando - ação necessária")
+                    else:
+                        insights_temporais.append("➡️ **TENDÊNCIA ESTÁVEL**: Vendas mantendo padrão")
+                
+                # Exibir insights
+                for insight in insights_temporais:
+                    st.info(insight)
+                
+                # === RECOMENDAÇÕES ESTRATÉGICAS ===
+                st.markdown("**🎯 Recomendações Estratégicas:**")
+                
+                recomendacoes_temporais = []
+                
+                # Recomendações baseadas nos insights
+                if not picos.empty:
+                    recomendacoes_temporais.append("🔍 **ANALISAR PICOS**: Identifique o que causou os dias excepcionais e replique")
+                
+                if not quedas.empty:
+                    recomendacoes_temporais.append("🚨 **FOCAR NAS QUEDAS**: Investigue e corrija os fatores dos dias fracos")
+                
+                # Recomendação do melhor dia
+                melhor_fat = performance_semanal.loc[performance_semanal['Fat_Medio'].idxmax(), 'Fat_Medio']
+                pior_fat = performance_semanal.loc[performance_semanal['Fat_Medio'].idxmin(), 'Fat_Medio']
+                gap_semanal = ((melhor_fat - pior_fat) / melhor_fat * 100)
+                
+                if gap_semanal > 50:
+                    recomendacoes_temporais.append(f"📊 **EQUALIZAR DIAS**: Gap de {gap_semanal:.0f}% entre melhor/pior dia - buscar equilibrar")
+                
+                recomendacoes_temporais.extend([
+                    f"🎯 **MAXIMIZAR {melhor_dia.upper()}**: Aproveitar seu dia mais forte",
+                    f"⚡ **ATIVAR {pior_dia.upper()}**: Criar estratégias específicas para o dia mais fraco",
+                    "📞 **TIMING COMERCIAL**: Concentrar ações de vendas nos dias/períodos mais receptivos",
+                    "📊 **MONITORAMENTO**: Acompanhar semanalmente para identificar mudanças nos padrões"
+                ])
+                
+                # Exibir recomendações
+                for i, recomendacao in enumerate(recomendacoes_temporais[:6], 1):  # Máximo 6 recomendações
+                    st.success(f"{i}. {recomendacao}")
+                
+            else:
+                st.info("📊 **Dados insuficientes** para análise temporal completa. Necessário pelo menos 5 dias de dados.")
+            
         else:
             st.warning("❌ Dados insuficientes para análises avançadas")
 
@@ -3662,12 +4593,105 @@ def pagina_configuracoes():
     
     st.info(f"**Layout atual:** {st.session_state.get('layout_mode', '🖥️ Desktop')}")
     
-    # === ATUALIZAÇÃO DE DADOS ===
+    # === GESTÃO DE DADOS ===
     st.markdown("---")
     st.subheader("📊 Gestão de Dados")
     
-    with st.expander("📥 Atualizar Dados de Vendas", expanded=False):
-        interface_atualizacao()
+    col_dados1, col_dados2 = st.columns(2)
+    
+    with col_dados1:
+        with st.expander("🏢 Dados do Atacado", expanded=False):
+            st.markdown("**📁 Arquivo Atual de Atacado:**")
+            
+            # Identificar arquivo atual do atacado
+            arquivos_atacado = [f for f in os.listdir('.') if f.startswith('Vendas até') and f.endswith('.txt')]
+            if arquivos_atacado:
+                arquivo_atual = sorted(arquivos_atacado)[-1]
+                st.info(f"📄 **{arquivo_atual}**")
+                
+                # Mostrar informações do arquivo
+                try:
+                    df_info = pd.read_csv(arquivo_atual, sep=';', encoding='latin-1', on_bad_lines='skip', nrows=5)
+                    st.success(f"✅ **{len(pd.read_csv(arquivo_atual, sep=';', encoding='latin-1', on_bad_lines='skip'))} registros** carregados")
+                except:
+                    st.warning("⚠️ Arquivo com problemas de leitura")
+            else:
+                st.error("❌ Nenhum arquivo de atacado encontrado")
+            
+            st.markdown("**📥 Atualizar Dados do Atacado:**")
+            arquivo_atacado = st.file_uploader(
+                "Novo arquivo de Atacado (.txt)",
+                type=['txt'],
+                key="upload_atacado",
+                help="Substitui ou adiciona aos dados existentes do atacado"
+            )
+            
+            if arquivo_atacado is not None:
+                if st.button("🚀 Processar Atacado", type="primary", key="btn_atacado"):
+                    with st.spinner("⏳ Processando dados do atacado..."):
+                        sucesso = processar_arquivo_atacado(arquivo_atacado)
+                    
+                    if sucesso:
+                        st.success("🎉 **Dados do Atacado atualizados!**")
+                        st.cache_data.clear()
+                        st.rerun()
+    
+    with col_dados2:
+        with st.expander("🏪 Dados do Varejo", expanded=False):
+            st.markdown("**📁 Arquivo Atual de Varejo:**")
+            
+            # Identificar arquivo atual do varejo
+            arquivos_varejo = [f for f in os.listdir('.') if 'varejo' in f.lower() and f.endswith('.txt')]
+            if arquivos_varejo:
+                arquivo_atual = arquivos_varejo[0]
+                st.info(f"📄 **{arquivo_atual}**")
+                
+                # Mostrar informações do arquivo
+                try:
+                    df_info = pd.read_csv(arquivo_atual, sep=';', encoding='latin-1', on_bad_lines='skip', nrows=5)
+                    st.success(f"✅ **{len(pd.read_csv(arquivo_atual, sep=';', encoding='latin-1', on_bad_lines='skip'))} registros** carregados")
+                except:
+                    st.warning("⚠️ Arquivo com problemas de leitura")
+            else:
+                st.error("❌ Nenhum arquivo de varejo encontrado")
+            
+            st.markdown("**📥 Atualizar Dados do Varejo:**")
+            arquivo_varejo = st.file_uploader(
+                "Novo arquivo de Varejo (.txt)",
+                type=['txt'],
+                key="upload_varejo",
+                help="Substitui ou adiciona aos dados existentes do varejo"
+            )
+            
+            if arquivo_varejo is not None:
+                if st.button("🚀 Processar Varejo", type="primary", key="btn_varejo"):
+                    with st.spinner("⏳ Processando dados do varejo..."):
+                        sucesso = processar_arquivo_varejo(arquivo_varejo)
+                    
+                    if sucesso:
+                        st.success("🎉 **Dados do Varejo atualizados!**")
+                        st.cache_data.clear()
+                        st.rerun()
+    
+    # === FERRAMENTAS GERAIS ===
+    st.markdown("**🔧 Ferramentas Gerais:**")
+    col_tool1, col_tool2 = st.columns(2)
+    
+    with col_tool1:
+        if st.button("🔄 Limpar Cache", help="Limpa o cache e recarrega dados"):
+            st.cache_data.clear()
+            st.success("✅ Cache limpo!")
+            st.rerun()
+    
+    with col_tool2:
+        if st.button("📋 Ver Backups", help="Lista dos backups disponíveis"):
+            backups = [f for f in os.listdir('.') if f.startswith('backup_vendas_') and f.endswith('.txt')]
+            if backups:
+                st.write("📂 **Backups disponíveis:**")
+                for backup in sorted(backups, reverse=True)[:5]:  # Últimos 5
+                    st.write(f"• {backup}")
+            else:
+                st.info("Nenhum backup encontrado")
     
     # === CONFIGURAÇÃO DE METAS ===
     st.markdown("---")
@@ -3675,60 +4699,134 @@ def pagina_configuracoes():
     
     # === METAS DE VENDAS ===
     with st.expander("💰 Metas de Faturamento", expanded=True):
+        
+        # === META DO ATACADO ===
         st.markdown("### 🏢 Configuração de Meta - Atacado")
         
-        col_config1, col_config2 = st.columns(2)
+        col_atac1, col_atac2 = st.columns(2)
         
-        with col_config1:
-            meta_atual = st.session_state.get('meta_atacado', 850000)
-            nova_meta = st.number_input(
-                "Meta Mensal de Faturamento (R$):",
-                value=meta_atual,
+        with col_atac1:
+            meta_atacado_atual = st.session_state.get('meta_atacado', 850000)
+            nova_meta_atacado = st.number_input(
+                "Meta Mensal Atacado (R$):",
+                value=meta_atacado_atual,
                 min_value=0,
                 step=1000,
                 format="%d",
+                key="meta_atacado_input",
                 help="Meta de faturamento mensal para o setor de atacado"
             )
         
-        with col_config2:
-            dias_atuais = st.session_state.get('dias_uteis_atacado', 27)
-            novos_dias = st.number_input(
-                "Dias Úteis do Mês:",
-                value=dias_atuais,
+        with col_atac2:
+            dias_atacado_atuais = st.session_state.get('dias_uteis_atacado', 27)
+            novos_dias_atacado = st.number_input(
+                "Dias Úteis Atacado:",
+                value=dias_atacado_atuais,
                 min_value=1,
                 max_value=31,
                 step=1,
-                help="Número de dias úteis no mês para cálculo das metas"
+                key="dias_atacado_input",
+                help="Número de dias úteis no mês para o atacado"
             )
         
-        # Botões de ação
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
+        # Botões de ação para Atacado
+        col_atac_btn1, col_atac_btn2, col_atac_btn3 = st.columns(3)
         
-        with col_btn1:
-            if st.button("💾 Salvar Configurações", use_container_width=True):
-                st.session_state.meta_atacado = nova_meta
-                st.session_state.dias_uteis_atacado = novos_dias
-                st.success("✅ Configurações salvas com sucesso!")
+        with col_atac_btn1:
+            if st.button("💾 Salvar Meta Atacado", use_container_width=True, key="salvar_atacado"):
+                st.session_state.meta_atacado = nova_meta_atacado
+                st.session_state.dias_uteis_atacado = novos_dias_atacado
+                st.success("✅ Meta do Atacado salva!")
                 st.rerun()
         
-        with col_btn2:
-            if st.button("🔄 Restaurar Padrões", use_container_width=True):
+        with col_atac_btn2:
+            if st.button("🔄 Restaurar Atacado", use_container_width=True, key="restaurar_atacado"):
                 st.session_state.meta_atacado = 850000
                 st.session_state.dias_uteis_atacado = 27
-                st.success("✅ Configurações padrão restauradas!")
+                st.success("✅ Meta padrão do Atacado restaurada!")
                 st.rerun()
         
-        with col_btn3:
-            ritmo_necessario = nova_meta / novos_dias if novos_dias > 0 else 0
+        with col_atac_btn3:
+            ritmo_atacado = nova_meta_atacado / novos_dias_atacado if novos_dias_atacado > 0 else 0
             st.metric(
-                label="🎯 Ritmo Necessário",
-                value=f"R$ {ritmo_necessario:,.0f}/dia",
-                help="Faturamento diário necessário para atingir a meta"
+                label="🎯 Ritmo Atacado",
+                value=f"R$ {ritmo_atacado:,.0f}/dia",
+                help="Faturamento diário necessário para atingir a meta do atacado"
             )
         
-        # Status atual
-        st.markdown("**📊 Configuração Atual:**")
-        st.info(f"💰 **Meta:** R$ {nova_meta:,.2f} | 📅 **Dias Úteis:** {novos_dias} | 🎯 **Ritmo:** R$ {ritmo_necessario:,.2f}/dia")
+        # Status atual Atacado
+        st.info(f"🏢 **Atacado:** R$ {nova_meta_atacado:,.0f} | 📅 {novos_dias_atacado} dias | 🎯 R$ {ritmo_atacado:,.0f}/dia")
+        
+        # === META DO VAREJO ===
+        st.markdown("---")
+        st.markdown("### 🏪 Configuração de Meta - Varejo")
+        
+        # Opção de ativar/desativar meta do varejo
+        ativar_meta_varejo = st.checkbox(
+            "🔧 Ativar configuração de meta para o Varejo",
+            value=st.session_state.get('ativar_meta_varejo', False),
+            help="Por enquanto, mantenha desativado conforme solicitado"
+        )
+        
+        st.session_state.ativar_meta_varejo = ativar_meta_varejo
+        
+        if ativar_meta_varejo:
+            col_var1, col_var2 = st.columns(2)
+            
+            with col_var1:
+                meta_varejo_atual = st.session_state.get('meta_varejo', 200000)
+                nova_meta_varejo = st.number_input(
+                    "Meta Mensal Varejo (R$):",
+                    value=meta_varejo_atual,
+                    min_value=0,
+                    step=1000,
+                    format="%d",
+                    key="meta_varejo_input",
+                    help="Meta de faturamento mensal para o setor de varejo"
+                )
+            
+            with col_var2:
+                dias_varejo_atuais = st.session_state.get('dias_uteis_varejo', 27)
+                novos_dias_varejo = st.number_input(
+                    "Dias Úteis Varejo:",
+                    value=dias_varejo_atuais,
+                    min_value=1,
+                    max_value=31,
+                    step=1,
+                    key="dias_varejo_input",
+                    help="Número de dias úteis no mês para o varejo"
+                )
+            
+            # Botões de ação para Varejo
+            col_var_btn1, col_var_btn2, col_var_btn3 = st.columns(3)
+            
+            with col_var_btn1:
+                if st.button("💾 Salvar Meta Varejo", use_container_width=True, key="salvar_varejo"):
+                    st.session_state.meta_varejo = nova_meta_varejo
+                    st.session_state.dias_uteis_varejo = novos_dias_varejo
+                    st.success("✅ Meta do Varejo salva!")
+                    st.rerun()
+            
+            with col_var_btn2:
+                if st.button("🔄 Restaurar Varejo", use_container_width=True, key="restaurar_varejo"):
+                    st.session_state.meta_varejo = 200000
+                    st.session_state.dias_uteis_varejo = 27
+                    st.success("✅ Meta padrão do Varejo restaurada!")
+                    st.rerun()
+            
+            with col_var_btn3:
+                ritmo_varejo = nova_meta_varejo / novos_dias_varejo if novos_dias_varejo > 0 else 0
+                st.metric(
+                    label="🎯 Ritmo Varejo",
+                    value=f"R$ {ritmo_varejo:,.0f}/dia",
+                    help="Faturamento diário necessário para atingir a meta do varejo"
+                )
+            
+            # Status atual Varejo
+            st.info(f"🏪 **Varejo:** R$ {nova_meta_varejo:,.0f} | 📅 {novos_dias_varejo} dias | 🎯 R$ {ritmo_varejo:,.0f}/dia")
+        
+        else:
+            st.info("🔧 **Meta do Varejo desativada** - Habilite a opção acima quando necessário")
     
     # === METAS DE CLIENTES ===
     with st.expander("👥 Metas de Clientes Novos", expanded=False):
@@ -3796,66 +4894,135 @@ def main():
         tela_boas_vindas()
         return
     
-    # Header com navegação bonita
-    st.markdown("""
-    <style>
-    .header-container {
-        background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    }
-    .header-title {
-        color: white;
-        font-size: 2rem;
-        font-weight: bold;
-        margin-bottom: 0.5rem;
-    }
-    .header-subtitle {
-        color: #E8F5E8;
-        font-size: 1rem;
-        margin-bottom: 1rem;
-    }
-    .nav-buttons {
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    # Header responsivo - otimizado para mobile
+    layout_mode = st.session_state.get('layout_mode', '🖥️ Desktop')
     
-    st.markdown("""
-    <div class="header-container">
-        <div class="header-title">🌾 Gestor Estratégico - Grãos S.A.</div>
-        <div class="header-subtitle">Sistema Inteligente de Gestão de Negócios</div>
-    </div>
-    """, unsafe_allow_html=True)
+    if layout_mode == "📱 Mobile":
+        # Header MÍNIMO para mobile
+        st.markdown("""
+        <style>
+        .header-mobile {
+            background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
+            padding: 0.4rem;
+            border-radius: 8px;
+            margin-bottom: 0.8rem;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header-mobile-title {
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin: 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="header-mobile">
+            <div class="header-mobile-title">🌾 Grãos S.A.</div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    # Navegação principal - Sistema integrado
-    col1, col2, col3, col4, col5 = st.columns([3, 3, 3, 3, 2])
+    else:
+        # Header completo para desktop
+        st.markdown("""
+        <style>
+        .header-container {
+            background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+        }
+        .header-title {
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .header-subtitle {
+            color: #E8F5E8;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div class="header-container">
+            <div class="header-title">🌾 Gestor Estratégico - Grãos S.A.</div>
+            <div class="header-subtitle">Sistema Inteligente de Gestão de Negócios</div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    with col1:
-        if st.button("🌍 Geral", use_container_width=True, help="Dashboard principal: Atacado + Varejo + Clientes"):
-            st.session_state.analise_selecionada = "geral"
+    # Navegação responsiva - otimizada para mobile
+    if layout_mode == "📱 Mobile":
+        # Layout compacto para mobile - 2 linhas de botões
+        st.markdown("""
+        <style>
+        .mobile-nav {
+            margin-bottom: 0.8rem;
+        }
+        .stButton > button {
+            height: 2.8rem;
+            font-size: 0.9rem;
+            font-weight: bold;
+            border-radius: 8px;
+            margin-bottom: 0.3rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Primeira linha - principais
+        col_m1, col_m2, col_m3 = st.columns(3)
+        with col_m1:
+            if st.button("🌍 Geral", use_container_width=True, key="mobile_geral", help="Dashboard principal"):
+                st.session_state.analise_selecionada = "geral"
+        with col_m2:
+            if st.button("🏢 Atacado", use_container_width=True, key="mobile_atacado", help="Dashboard Atacado"):
+                st.session_state.analise_selecionada = "atacado"
+        with col_m3:
+            if st.button("🏪 Varejo", use_container_width=True, key="mobile_varejo", help="Dashboard Varejo"):
+                st.session_state.analise_selecionada = "varejo"
+        
+        # Espaçamento entre linhas
+        st.markdown("<div style='margin: 0.2rem 0;'></div>", unsafe_allow_html=True)
+        
+        # Segunda linha - secundários
+        col_m4, col_m5, col_m6 = st.columns([2, 2, 1])
+        with col_m4:
+            if st.button("👥 Clientes", use_container_width=True, key="mobile_clientes", help="Análises de clientes"):
+                st.session_state.analise_selecionada = "clientes"
+        with col_m5:
+            if st.button("⚙️ Config", use_container_width=True, key="mobile_config", type="secondary", help="Configurações"):
+                st.session_state.analise_selecionada = "configuracoes"
+        # col_m6 fica vazia para balanceamento
     
-    with col2:
-        if st.button("🏢 Atacado", use_container_width=True, help="Dashboard detalhado do setor de Atacado"):
-            st.session_state.analise_selecionada = "atacado"
-    
-    with col3:
-        if st.button("🏪 Varejo", use_container_width=True, help="Dashboard detalhado do setor de Varejo"):
-            st.session_state.analise_selecionada = "varejo"
-    
-    with col4:
-        if st.button("👥 Clientes", use_container_width=True, help="Análises de clientes (apenas atacado)"):
-            st.session_state.analise_selecionada = "clientes"
-    
-    with col5:
-        if st.button("⚙️ Config", use_container_width=True, help="Configurações do sistema", type="secondary"):
-            st.session_state.analise_selecionada = "configuracoes"
+    else:
+        # Layout desktop - linha única
+        col1, col2, col3, col4, col5 = st.columns([3, 3, 3, 3, 2])
+        
+        with col1:
+            if st.button("🌍 Geral", use_container_width=True, help="Dashboard principal: Atacado + Varejo + Clientes"):
+                st.session_state.analise_selecionada = "geral"
+        
+        with col2:
+            if st.button("🏢 Atacado", use_container_width=True, help="Dashboard detalhado do setor de Atacado"):
+                st.session_state.analise_selecionada = "atacado"
+        
+        with col3:
+            if st.button("🏪 Varejo", use_container_width=True, help="Dashboard detalhado do setor de Varejo"):
+                st.session_state.analise_selecionada = "varejo"
+        
+        with col4:
+            if st.button("👥 Clientes", use_container_width=True, help="Análises de clientes (apenas atacado)"):
+                st.session_state.analise_selecionada = "clientes"
+        
+        with col5:
+            if st.button("⚙️ Config", use_container_width=True, help="Configurações do sistema", type="secondary"):
+                st.session_state.analise_selecionada = "configuracoes"
     
     # Inicializar sessão se não existir
     if 'analise_selecionada' not in st.session_state:
@@ -3865,7 +5032,11 @@ def main():
     if 'layout_mode' not in st.session_state:
         st.session_state.layout_mode = "🖥️ Desktop"
     
-    st.markdown("---")
+    # Espaçamento responsivo
+    if layout_mode == "📱 Mobile":
+        st.markdown("<br>", unsafe_allow_html=True)  # Espaço mínimo para mobile
+    else:
+        st.markdown("---")  # Linha divisória completa para desktop
     
     # Carregando dados
     with st.spinner("Carregando dados..."):
