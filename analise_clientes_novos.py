@@ -540,7 +540,7 @@ def calcular_estimativas(total_mes, meta_clientes, dias_uteis, data_mais_recente
     if dias_uteis_trabalhados > 0:
         ritmo_diario_atual = total_mes / dias_uteis_trabalhados
         projecao_fim_mes = ritmo_diario_atual * dias_uteis
-    else:
+        else:
         ritmo_diario_atual = 0
         projecao_fim_mes = 0
     
@@ -705,8 +705,8 @@ def analise_clientes_novos(df, layout_mode):
     st.subheader("📊 Progresso da Meta")
     
     col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
+        
+        with col1:
         delta_valor = total_mes - meta_clientes if total_mes >= meta_clientes else None
         delta_cor = "normal" if total_mes >= meta_clientes else "inverse"
         st.metric(
@@ -716,15 +716,15 @@ def analise_clientes_novos(df, layout_mode):
             delta_color=delta_cor,
             help=f"Progresso: {estimativas['progresso_percentual']:.1f}%"
         )
-    
-    with col2:
+        
+        with col2:
         st.metric(
             label="👥 Novos Hoje", 
             value=total_hoje,
             help="Clientes novos na última data de vendas"
         )
     
-    with col3:
+            with col3:
         st.metric(
             label="💰 Média 1ª Compra", 
             value=f"R$ {media_compra_mes:,.2f}",
@@ -867,7 +867,7 @@ def analise_clientes_novos(df, layout_mode):
                                 # Mostrar variações com cores
                 if var_clientes >= 0:
                     st.success(f"👥 +{var_clientes} ({var_clientes_pct:+.1f}%)")
-                else:
+    else:
                     st.error(f"👥 {var_clientes} ({var_clientes_pct:+.1f}%)")
                 
                 if var_ticket >= 0:
@@ -915,7 +915,7 @@ def analise_clientes_novos(df, layout_mode):
             if not analises:
                 st.info("📊 **ESTÁVEL**: Performance similar ao mês anterior")
                 
-        else:
+            else:
             st.warning(f"❌ Não foi possível calcular métricas para {mes_selecionado_nome}")
             
     else:
@@ -1310,8 +1310,8 @@ def tela_boas_vindas():
     
     with col_layout2:
         st.markdown("### 🖥️ Escolha o Layout Ideal")
-        st.markdown("*Selecione o formato que melhor se adapta ao seu dispositivo:*")
-        
+    st.markdown("*Selecione o formato que melhor se adapta ao seu dispositivo:*")
+    
         col_desktop, col_mobile = st.columns(2)
         
         with col_desktop:
@@ -4927,36 +4927,36 @@ def main():
     
     else:
         # Header completo para desktop
-        st.markdown("""
-        <style>
-        .header-container {
-            background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            text-align: center;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-        }
-        .header-title {
-            color: white;
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-        .header-subtitle {
-            color: #E8F5E8;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("""
-        <div class="header-container">
+    st.markdown("""
+    <style>
+    .header-container {
+        background: linear-gradient(90deg, #2E7D32 0%, #4CAF50 100%);
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+        text-align: center;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    .header-title {
+        color: white;
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .header-subtitle {
+        color: #E8F5E8;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="header-container">
             <div class="header-title">🌾 Gestor Estratégico - Grãos S.A.</div>
             <div class="header-subtitle">Sistema Inteligente de Gestão de Negócios</div>
-        </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     # Navegação responsiva - otimizada para mobile
     if layout_mode == "📱 Mobile":
@@ -5004,24 +5004,24 @@ def main():
     else:
         # Layout desktop - linha única
         col1, col2, col3, col4, col5 = st.columns([3, 3, 3, 3, 2])
-        
-        with col1:
+    
+    with col1:
             if st.button("🌍 Geral", use_container_width=True, help="Dashboard principal: Atacado + Varejo + Clientes"):
                 st.session_state.analise_selecionada = "geral"
-        
-        with col2:
+    
+    with col2:
             if st.button("🏢 Atacado", use_container_width=True, help="Dashboard detalhado do setor de Atacado"):
                 st.session_state.analise_selecionada = "atacado"
-        
-        with col3:
+    
+    with col3:
             if st.button("🏪 Varejo", use_container_width=True, help="Dashboard detalhado do setor de Varejo"):
                 st.session_state.analise_selecionada = "varejo"
-        
-        with col4:
+    
+    with col4:
             if st.button("👥 Clientes", use_container_width=True, help="Análises de clientes (apenas atacado)"):
                 st.session_state.analise_selecionada = "clientes"
-        
-        with col5:
+    
+    with col5:
             if st.button("⚙️ Config", use_container_width=True, help="Configurações do sistema", type="secondary"):
                 st.session_state.analise_selecionada = "configuracoes"
     
@@ -5068,7 +5068,7 @@ def main():
     elif st.session_state.analise_selecionada == "clientes":
         if df_atacado.empty:
             st.warning("❌ Dados do atacado necessários para análise de clientes")
-        else:
+    else:
             # Clientes com sub-navegação expandida (apenas atacado)
             tabs_clientes = st.tabs(["👶 Clientes Novos", "👥 Análise Geral", "🎯 Reativação"])
             
