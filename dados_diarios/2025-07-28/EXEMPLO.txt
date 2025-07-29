@@ -1,0 +1,21 @@
+# EXEMPLO DE ORGANIZAÇÃO - DIA 28/07/2025
+
+Para atualizar os dados de hoje (28/07/2025), adicione nesta pasta:
+
+1. **atacado-28-07-2025.txt** - Arquivo com as vendas de atacado do dia 28/07/2025
+2. **varejo-28-07-2025.txt** - Arquivo com as vendas de varejo do dia 28/07/2025
+
+## Formato dos arquivos
+Os arquivos devem seguir o mesmo formato dos dados existentes:
+- Separados por tabulação (TAB)
+- Codificação: latin-1
+- Colunas obrigatórias: Data, Cliente, Total_Venda (ou Total), etc.
+
+## Após upload no dashboard
+O sistema irá:
+1. Fazer backup dos dados atuais
+2. Integrar os novos dados com os históricos
+3. Gerar arquivos consolidados atualizados
+4. Salvar tudo nesta mesma pasta
+
+## Este arquivo pode ser deletado após a primeira atualização real. 
