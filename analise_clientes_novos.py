@@ -5008,18 +5008,20 @@ def main():
         st.markdown("<div style='margin: 0.2rem 0;'></div>", unsafe_allow_html=True)
         
         # Segunda linha - secundários
-        col_m4, col_m5, col_m6 = st.columns([2, 2, 1])
+        col_m4, col_m5, col_m6 = st.columns([2, 2, 2])
         with col_m4:
             if st.button("👥 Clientes", use_container_width=True, key="mobile_clientes", help="Análises de clientes"):
                 st.session_state.analise_selecionada = "clientes"
         with col_m5:
+            if st.button("📅 Temporal", use_container_width=True, key="mobile_temporal", help="Análise temporal julho"):
+                st.session_state.analise_selecionada = "temporal"
+        with col_m6:
             if st.button("⚙️ Config", use_container_width=True, key="mobile_config", type="secondary", help="Configurações"):
                 st.session_state.analise_selecionada = "configuracoes"
-        # col_m6 fica vazia para balanceamento
     
     else:
         # Layout desktop - linha única
-        col1, col2, col3, col4, col5 = st.columns([3, 3, 3, 3, 2])
+        col1, col2, col3, col4, col5, col6 = st.columns([2.5, 2.5, 2.5, 2.5, 2.5, 1.5])
         
         with col1:
             if st.button("🌍 Geral", use_container_width=True, help="Dashboard principal: Atacado + Varejo + Clientes"):
@@ -5038,6 +5040,10 @@ def main():
                 st.session_state.analise_selecionada = "clientes"
         
         with col5:
+            if st.button("📅 Temporal", use_container_width=True, help="Análise temporal de julho 2025"):
+                st.session_state.analise_selecionada = "temporal"
+        
+        with col6:
             if st.button("⚙️ Config", use_container_width=True, help="Configurações do sistema", type="secondary"):
                 st.session_state.analise_selecionada = "configuracoes"
     
@@ -5096,6 +5102,34 @@ def main():
                 
             with tabs_clientes[2]:
                 analise_reativacao_clientes(df_atacado, st.session_state.layout_mode)
+    
+    elif st.session_state.analise_selecionada == "temporal":
+        # Redirecionar para análise temporal independente
+        st.title("📅 Análise Temporal - Julho 2025")
+        st.info("🚀 **Análise temporal disponível em dashboard separado!**")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("""
+            ### 🎯 **Funcionalidades da Análise Temporal:**
+            - 📊 **Gráficos interativos** de vendas diárias
+            - 🏢 **Comparação Atacado vs Varejo** por dia
+            - 📈 **Métricas do mês** (total, média, melhor dia)
+            - 🔄 **Análise sazonal** por período do mês
+            - 📋 **Tabela detalhada** opcional
+            """)
+        
+        with col2:
+            if st.button("🚀 Abrir Análise Temporal", type="primary", use_container_width=True):
+                st.balloons()
+        
+        st.markdown("---")
+        st.success("💡 **Como acessar:** Abra uma nova aba no navegador e acesse `http://localhost:8504`")
+        
+        # Instruções para executar se não estiver rodando
+        with st.expander("🔧 Se a análise temporal não estiver rodando"):
+            st.code("python -m streamlit run analise_temporal_julho.py --server.port 8504", language="bash")
+            st.caption("Execute este comando no terminal para iniciar a análise temporal")
     
     elif st.session_state.analise_selecionada == "configuracoes":
         pagina_configuracoes()
