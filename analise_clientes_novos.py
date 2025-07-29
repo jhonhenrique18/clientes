@@ -1935,13 +1935,22 @@ def calcular_projecoes_melhoradas(df, meta_mensal=850000, dias_uteis=27):
 def carregar_dados_varejo():
     """Carrega dados do varejo - apenas julho 2025"""
     try:
-        # Procurar arquivo de varejo
-        arquivos_varejo = [f for f in os.listdir('.') if 'varejo' in f.lower() and f.endswith('.txt')]
+        # Buscar arquivo de varejo mais recente (dados até 28/07/2025)
+        arquivo_varejo = None
         
-        if not arquivos_varejo:
+        # Primeiro tentar na pasta dados_diarios (mais recente)
+        if os.path.exists('dados_diarios/2025-07-28/varejo_ate_28072025.txt'):
+            arquivo_varejo = 'dados_diarios/2025-07-28/varejo_ate_28072025.txt'
+        elif os.path.exists('dados_diarios/2025-07-26/varejo_ate_26072025.txt'):
+            arquivo_varejo = 'dados_diarios/2025-07-26/varejo_ate_26072025.txt'
+        else:
+            # Fallback para busca na raiz
+            arquivos_varejo = [f for f in os.listdir('.') if 'varejo' in f.lower() and f.endswith('.txt')]
+            if arquivos_varejo:
+                arquivo_varejo = arquivos_varejo[0]
+        
+        if not arquivo_varejo:
             return None
-        
-        arquivo_varejo = arquivos_varejo[0]  # Pegar o primeiro arquivo encontrado
         
         # Tentar diferentes encodings
         encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1', 'utf-8-sig', 'cp850']
