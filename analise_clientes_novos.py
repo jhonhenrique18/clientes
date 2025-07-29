@@ -1981,9 +1981,9 @@ def carregar_dados_varejo():
                     
                     # REMOVER DUPLICAÇÕES - detectadas duplicatas por data+cliente+valor
                     # Criar chave única para identificar duplicatas
-                    df_varejo['chave_unica'] = (df_varejo['Data Competência'].astype(str) + '_' + 
-                                               df_varejo['Parceiro'].astype(str) + '_' + 
-                                               df_varejo['Total Venda'].astype(str))
+                    df_varejo['chave_unica'] = (df_varejo['Data_Competencia'].astype(str) + '_' + 
+                                               df_varejo['Nome_Cliente'].astype(str) + '_' + 
+                                               df_varejo['Total_Venda'].astype(str))
                     
                     # Remover duplicatas mantendo apenas a primeira ocorrência
                     df_varejo = df_varejo.drop_duplicates(subset=['chave_unica'], keep='first')
